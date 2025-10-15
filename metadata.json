@@ -1,0 +1,5 @@
+{
+  "name": "Smart Study Companion",
+  "description": "An intelligent study aid that automatically creates summaries, quizzes, and flashcards from your uploaded lecture notes or textbook content.",
+  "requestFramePermissions": []
+}
