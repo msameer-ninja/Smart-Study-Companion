@@ -130,4 +130,4 @@ Open an issue or reach out directly through the repository discussions tab.
 
 ### 📝 License
 
-This project is licensed under the [MIT License](My-link-here)↗️.
+This project is licensed under the [MIT License](LICENSE)↗️.
