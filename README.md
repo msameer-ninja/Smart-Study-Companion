@@ -97,13 +97,6 @@ http://localhost:3000
 
 ---
 
-## 📸 Screenshots
-
-![Dashboard Screenshot](./assets/dashboard.png)
-![Quiz Generator Demo](./assets/quiz-demo.gif)
-
----
-
 ## 🛠️ Contributing
 
 Contributions are always welcome!
