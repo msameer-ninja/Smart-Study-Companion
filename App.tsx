@@ -1,16 +1,17 @@
-
 import React, { useState, useCallback } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { SummaryView } from './components/SummaryView';
 import { QuizView } from './components/QuizView';
 import { FlashcardView } from './components/FlashcardView';
+import { QnaView } from './components/QnaView';
 import { Loader } from './components/Loader';
 import { Icon } from './components/Icon';
-import { generateSummary, generateQuiz, generateFlashcards } from './services/geminiService';
-import type { QuizQuestion, Flashcard } from './types';
+import { generateSummary, generateQuiz, generateFlashcards, createQnaChat, generateQnaAnswer } from './services/geminiService';
+import type { QuizQuestion, Flashcard, ChatMessage } from './types';
 import { Github } from 'lucide-react';
+import type { Chat } from '@google/genai';
 
-type ActiveTab = 'summary' | 'quiz' | 'flashcards';
+type ActiveTab = 'summary' | 'quiz' | 'flashcards' | 'qna';
 
 const App: React.FC = () => {
   const [originalContent, setOriginalContent] = useState<string | null>(null);
@@ -19,11 +20,14 @@ const App: React.FC = () => {
   const [summary, setSummary] = useState<string | null>(null);
   const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
   const [flashcards, setFlashcards] = useState<Flashcard[] | null>(null);
+  const [qnaChat, setQnaChat] = useState<Chat | null>(null);
+  const [qnaMessages, setQnaMessages] = useState<ChatMessage[]>([]);
   
   const [isLoading, setIsLoading] = useState({
     summary: false,
     quiz: false,
     flashcards: false,
+    qna: false,
   });
   const [error, setError] = useState<string | null>(null);
   
@@ -35,6 +39,8 @@ const App: React.FC = () => {
     setSummary(null);
     setQuiz(null);
     setFlashcards(null);
+    setQnaChat(null);
+    setQnaMessages([]);
     setError(null);
     setActiveTab('summary');
   };
@@ -45,6 +51,10 @@ const App: React.FC = () => {
     setFileName(name);
     setError(null);
     
+    const chat = createQnaChat(content);
+    setQnaChat(chat);
+    setQnaMessages([{ role: 'model', text: "Great! I've read the document. What would you like to know?" }]);
+
     setIsLoading(prev => ({ ...prev, summary: true }));
     try {
       const generatedSummary = await generateSummary(content);
@@ -87,6 +97,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSendMessage = async (message: string) => {
+    if (!qnaChat) return;
+
+    const newUserMessage: ChatMessage = { role: 'user', text: message };
+    setQnaMessages(prev => [...prev, newUserMessage]);
+    setIsLoading(prev => ({ ...prev, qna: true }));
+    setError(null);
+
+    try {
+      const answer = await generateQnaAnswer(qnaChat, message);
+      const newModelMessage: ChatMessage = { role: 'model', text: answer };
+      setQnaMessages(prev => [...prev, newModelMessage]);
+    } catch(e) {
+      console.error(e);
+      const errorMessage: ChatMessage = { role: 'model', text: "Sorry, I encountered an error. Please try again." };
+      setQnaMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(prev => ({ ...prev, qna: false }));
+    }
+  };
+
   const handleTabChange = (tab: ActiveTab) => {
     setActiveTab(tab);
     if (tab === 'quiz' && !quiz) {
@@ -104,7 +135,7 @@ const App: React.FC = () => {
             Smart Study Companion
           </h1>
           <p className="mt-2 text-lg text-slate-600 max-w-2xl mx-auto">
-            Upload your notes, get instant summaries, quizzes, and flashcards powered by AI.
+            Upload your notes, get instant summaries, quizzes, flashcards, and AI-powered answers.
           </p>
         </header>
 
@@ -135,7 +166,7 @@ const App: React.FC = () => {
             <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
               <nav className="border-b border-slate-200">
                 <div className="flex space-x-1 sm:space-x-2 p-2 bg-slate-50">
-                  {(['summary', 'quiz', 'flashcards'] as ActiveTab[]).map((tab) => (
+                  {(['summary', 'quiz', 'flashcards', 'qna'] as ActiveTab[]).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => handleTabChange(tab)}
@@ -161,6 +192,9 @@ const App: React.FC = () => {
                 )}
                 {activeTab === 'flashcards' && (
                   isLoading.flashcards ? <Loader text="Creating your flashcards..." /> : <FlashcardView flashcards={flashcards} />
+                )}
+                {activeTab === 'qna' && (
+                  <QnaView messages={qnaMessages} onSendMessage={handleSendMessage} isLoading={isLoading.qna} />
                 )}
               </div>
             </div>

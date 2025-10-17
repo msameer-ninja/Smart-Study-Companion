@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Chat } from "@google/genai";
 import type { QuizQuestion, Flashcard } from '../types';
 
 if (!process.env.API_KEY) {
@@ -10,13 +9,45 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const model = 'gemini-2.5-flash';
 
+export const createQnaChat = (content: string): Chat => {
+    const systemInstruction = `You are an expert tutor. Your goal is to help the user understand the document they have provided. Answer the user's questions based ONLY on the provided text. If the answer is not in the text, say that you cannot find the information in the provided document. Be concise and clear in your explanations.`;
+
+    const chat = ai.chats.create({
+        model,
+        config: {
+            systemInstruction,
+        },
+        history: [
+            {
+                role: "user",
+                parts: [{ text: `Here is the document I want to ask questions about:\n\n---\n${content}\n---` }],
+            },
+            {
+                role: "model",
+                parts: [{ text: "Great! I've read the document. What would you like to know?" }],
+            }
+        ],
+    });
+    return chat;
+};
+
+export const generateQnaAnswer = async (chat: Chat, message: string): Promise<string> => {
+    try {
+        const response = await chat.sendMessage({ message });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating Q&A answer:", error);
+        throw new Error("Could not get an answer from the AI.");
+    }
+};
+
 export const generateSummary = async (content: string): Promise<string> => {
-  const prompt = `Please provide a detailed, well-structured summary of the following text. The summary should be easy to understand, highlighting the key concepts, main arguments, and important conclusions. Use bullet points for key takeaways. Text to summarize:\n\n---\n${content}\n---`;
+  const instruction = `Please provide a detailed, well-structured summary of the following text. The summary should be easy to understand, highlighting the key concepts, main arguments, and important conclusions. Use bullet points for key takeaways. Text to summarize:`;
 
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: prompt,
+      contents: [instruction, content],
     });
     return response.text;
   } catch (error) {
@@ -26,12 +57,12 @@ export const generateSummary = async (content: string): Promise<string> => {
 };
 
 export const generateQuiz = async (content: string): Promise<QuizQuestion[]> => {
-  const prompt = `Based on the following text, create a multiple-choice quiz with exactly 5 questions. Each question must have 4 options, and only one option can be correct. Ensure the questions cover different aspects of the text. Text to use for quiz generation:\n\n---\n${content}\n---`;
+  const instruction = `Based on the following text, create a multiple-choice quiz with exactly 5 questions. Each question must have 4 options, and only one option can be correct. Ensure the questions cover different aspects of the text. Text to use for quiz generation:`;
 
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: prompt,
+      contents: [instruction, content],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -69,12 +100,12 @@ export const generateQuiz = async (content: string): Promise<QuizQuestion[]> => 
 };
 
 export const generateFlashcards = async (content: string): Promise<Flashcard[]> => {
-  const prompt = `From the text below, create a set of 10 flashcards. Each flashcard should represent a key term, concept, or important name from the text. For each flashcard, provide a "term" and a concise "definition". Text to use for flashcard generation:\n\n---\n${content}\n---`;
+  const instruction = `From the text below, create a set of 10 flashcards. Each flashcard should represent a key term, concept, or important name from the text. For each flashcard, provide a "term" and a concise "definition". Text to use for flashcard generation:`;
 
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: prompt,
+      contents: [instruction, content],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
